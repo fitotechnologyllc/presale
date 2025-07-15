@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
 import PresaleProgress from './PresaleProgress';
@@ -5,7 +6,6 @@ import CountdownTimer from './CountdownTimer';
 import { PRESALE_PRICE_ETH, FITOCHAIN_NETWORK, PRESALE_START_DATE, PRESALE_CONTROLLER_ADDRESS } from '../constants';
 import { useWallet } from '../hooks/useWallet';
 import { usePresaleContract } from '../hooks/usePresaleContract';
-import { createFiatPayment } from '../services/nowpaymentsService';
 import BankCardIcon from './icons/BankCardIcon';
 import AdminControls from './AdminControls';
 
@@ -87,13 +87,30 @@ const Hero: React.FC = () => {
 
         setIsCardPaymentLoading(true);
         setCardPaymentError(null);
-        const paymentUrl = await createFiatPayment(ethValue, account!);
-        setIsCardPaymentLoading(false);
+        
+        try {
+            const response = await fetch('/api/createPayment', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ethAmount: ethValue, payoutAddress: account }),
+            });
 
-        if (paymentUrl) {
-            window.open(paymentUrl, '_blank', 'noopener,noreferrer');
-        } else {
-            setCardPaymentError("Could not create payment link. Please try again later.");
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.message || 'Could not create payment link.');
+            }
+            
+            if (data.paymentUrl) {
+                window.open(data.paymentUrl, '_blank', 'noopener,noreferrer');
+            } else {
+                 throw new Error('Payment URL was not returned.');
+            }
+
+        } catch (err: any) {
+             setCardPaymentError(err.message || "An unknown error occurred. Please try again later.");
+        } finally {
+            setIsCardPaymentLoading(false);
         }
     };
 
@@ -108,13 +125,12 @@ const Hero: React.FC = () => {
     };
 
     const handleCryptoButtonClick = () => {
-        if (!isCurrentlyActive || isPaused) return;
+        if (!isCurrentlyActive || isPaused || tx.loading) return;
         if (!isConnected) connectWallet();
         else if (!isCorrectNetwork) switchToFitochain();
         else handleBuyWithCrypto();
     };
 
-    const isCryptoButtonDisabled = isLoading || !isCurrentlyActive || isPaused || tx.loading;
     const isCardButtonDisabled = isLoading || !isCurrentlyActive || isPaused || !isConnected || isCardPaymentLoading;
     const combinedError = tx.error || contractError;
 
@@ -160,7 +176,7 @@ const Hero: React.FC = () => {
                     <p className="text-center text-sm text-slate-500 mt-4">1 ETH = {(1 / PRESALE_PRICE_ETH).toLocaleString()} FITO</p>
                     
                     <div className="mt-6 space-y-3">
-                         <button onClick={handleCryptoButtonClick} disabled={isCryptoButtonDisabled && (isConnected && isCorrectNetwork)} className={`w-full text-lg font-bold py-3.5 rounded-lg transition-all duration-300 ${!isConnected ? 'bg-green-500 text-white hover:bg-green-600' : !isCorrectNetwork ? 'bg-yellow-500 text-slate-900 hover:bg-yellow-400' : 'bg-green-500 text-white hover:bg-green-600 shadow-lg shadow-green-500/20'} disabled:bg-slate-400 disabled:cursor-not-allowed`}>
+                         <button onClick={handleCryptoButtonClick} disabled={isPaused || tx.loading} className={`w-full text-lg font-bold py-3.5 rounded-lg transition-all duration-300 ${!isConnected ? 'bg-green-500 text-white hover:bg-green-600' : !isCorrectNetwork ? 'bg-yellow-500 text-slate-900 hover:bg-yellow-400' : 'bg-green-500 text-white hover:bg-green-600 shadow-lg shadow-green-500/20'} disabled:bg-slate-400 disabled:cursor-not-allowed`}>
                             {getCryptoButtonText()}
                         </button>
                         {isConnected && chainId && !isCorrectNetwork && <p className="text-center text-yellow-600 text-sm">Wrong Network! Your wallet is on chain ID {chainId}.</p>}

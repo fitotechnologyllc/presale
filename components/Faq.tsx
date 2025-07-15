@@ -1,6 +1,6 @@
+
 import React, { useState, useEffect } from 'react';
 import { FaqItem } from '../types';
-import { generateFaqContent } from '../services/geminiService';
 import ChevronDownIcon from './icons/ChevronDownIcon';
 import { FITOCHAIN_NETWORK } from '../constants';
 
@@ -26,14 +26,38 @@ const FaqAccordion: React.FC<{ item: FaqItem; isOpen: boolean; onClick: () => vo
 const Faq: React.FC = () => {
     const [faqs, setFaqs] = useState<FaqItem[]>([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [openIndex, setOpenIndex] = useState<number | null>(0);
 
     useEffect(() => {
         const fetchFaqs = async () => {
             setLoading(true);
-            const content = await generateFaqContent(FITOCHAIN_NETWORK);
-            setFaqs(content);
-            setLoading(false);
+            setError(null);
+            try {
+                const response = await fetch('/api/generateFaq', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ networkInfo: FITOCHAIN_NETWORK }),
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || 'Failed to fetch FAQs.');
+                }
+
+                const content = await response.json();
+                setFaqs(content);
+            } catch (err: any) {
+                console.error("Error fetching FAQ content:", err);
+                setError(err.message || "Could not load FAQs. Please try again later.");
+                // Fallback content on error
+                 setFaqs([
+                    { question: "What is Fitochain?", answer: "Fitochain is a revolutionary blockchain for the fitness industry. There was an error fetching dynamic content." },
+                    { question: "How can I participate in the presale?", answer: "Connect your wallet, enter the amount you wish to contribute, and confirm the transaction." },
+                ]);
+            } finally {
+                setLoading(false);
+            }
         };
         fetchFaqs();
     }, []);
@@ -49,6 +73,8 @@ const Faq: React.FC = () => {
                 <div className="bg-white/50 border border-slate-200 rounded-xl overflow-hidden shadow-lg">
                     {loading ? (
                          <div className="p-8 text-center text-slate-500">Loading FAQs...</div>
+                    ) : error ? (
+                         <div className="p-8 text-center text-red-500">{error}</div>
                     ) : (
                         faqs.map((faq, index) => (
                             <FaqAccordion

@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { ethers, type ContractTransactionResponse } from 'ethers';
 import { useWallet } from './useWallet';
@@ -75,7 +76,7 @@ export const usePresaleContract = () => {
     // Effect to initialize contract and fetch data periodically
     useEffect(() => {
         // Configuration check to prevent errors with placeholder address
-        if (PRESALE_TOKEN_ADDRESS === "0x0000000000000000000000000000000000000000" || PRESALE_TOKEN_ADDRESS === "0x1234567890123456789012345678901234567890") {
+        if (PRESALE_TOKEN_ADDRESS === ethers.ZeroAddress) {
             setError("Configuration Error: You must update the PRESALE_TOKEN_ADDRESS in 'constants.ts' with your deployed contract address.");
             setIsLoading(false);
             return; // Halt execution if the address is not configured
